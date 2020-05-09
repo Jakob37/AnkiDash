@@ -12,6 +12,7 @@ app.layout = html.Div([
     dcc.Graph(figure=fig)
 ])
 
-app.run_server(debug=False, use_reloader=False)
+if __name__ == '__main__':
+    app.run_server()
 
 
