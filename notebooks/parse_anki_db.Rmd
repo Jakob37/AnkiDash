@@ -1,0 +1,32 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+1579686732242
+character_ids <- read_tsv("../data/cards.csv") %>% filter(did == 1550758092309) %>% dplyr::select(card_id=id, notes_id=nid)
+notes_df <- read_tsv("../data/notes.tsv") %>% mutate(notes_id=id)
+
+character_ids_w_char <- character_ids %>% dplyr::inner_join(notes_df, by="notes_id") %>% dplyr::select(card_id, notes_id, character=sfld)
+head(character_ids_w_char)
+
+revlog_df <- read_tsv("../data/revlog.csv") %>% dplyr::mutate(card_id=cid) %>% filter(card_id %in% character_ids_w_char$card_id)
+
+top_difficult_cards <- revlog_df %>% group_by(card_id) %>% summarize(reviews=length(id)) %>% arrange(desc(reviews))
+
+
+
+top_difficult_df <- top_difficult_cards %>% inner_join(character_ids_w_char, by="card_id")
+
+write_tsv(top_difficult_df, path = "top_difficult.tsv")
+
+# notes_df <- read_tsv("../data/notes.tsv") %>% mutate(id=as.character(id))
+
+# table(notes_df$id %in% character_ids)
+```
+

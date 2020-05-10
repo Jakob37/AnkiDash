@@ -1,2 +1,6 @@
+*.Rproj
+*.nb.html
 dash_env/
+*.swp
 data/
+.Rproj.user
