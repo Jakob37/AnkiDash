@@ -1,4 +1,6 @@
 *.Rproj
+*.iml
+.idea/
 *.nb.html
 dash_env/
 *.swp
