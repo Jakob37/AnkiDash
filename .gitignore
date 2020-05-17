@@ -1,4 +1,6 @@
 *.Rproj
+test/
+.Rhistory
 *.iml
 .idea/
 *.nb.html

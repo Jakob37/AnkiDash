@@ -24,19 +24,27 @@ revlog_df <- read_tsv("../data/revlog.csv") %>%
     inner_join(character_ids_w_char %>% dplyr::select(card_id, character), by="card_id") %>%
     mutate(duration=ifelse(lastIvl < 0, -lastIvl/3600/24, lastIvl))
 
-head(revlog_df)
-
-top_difficult_cards <- revlog_df %>% 
+revlog_df_w_nbr <- revlog_df %>% 
     group_by(card_id) %>% 
-    summarize(reviews=length(id)) %>% 
+    group_map(~.x %>% mutate(nbr=seq_len(n())), keep = TRUE) %>% 
+    do.call("rbind", .)
+
+top_difficult_cards <- revlog_df_w_nbr %>% 
+    group_by(card_id) %>% 
+    summarize(
+        reviews=length(id), 
+        curr_dur=tail(lastIvl, 1), 
+        curr_ease=sprintf("ease_%s", tail(ease, 1)),
+        avg_ease=mean(ease)
+    ) %>% 
+    mutate(curr_dur=ifelse(curr_dur<0, 0, curr_dur)) %>%
     arrange(desc(reviews))
 
-revlog_df
-
 top_difficult_df <- top_difficult_cards %>% inner_join(character_ids_w_char, by="card_id")
+write_tsv(top_difficult_df, path = "../parsed_data/top_difficult.tsv")
+write_tsv(revlog_df_w_nbr, path = "../parsed_data/all_reviews.tsv")
 
-write_tsv(top_difficult_df, path = "top_difficult.tsv")
-write_tsv(revlog_df, path = "all_reviews.tsv")
+
 
 # notes_df <- read_tsv("../data/notes.tsv") %>% mutate(id=as.character(id))
 # table(notes_df$id %in% character_ids)
