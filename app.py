@@ -19,7 +19,8 @@ fig = px.bar(
     y="reviews",
     title="Jakob's most reviewed characters")
 
-axis_choices = ['avg_ease', 'reviews', 'curr_dur']
+axis_choices = [
+    {'label': option, 'value': option} for option in ['avg_ease', 'reviews', 'curr_dur']]
 
 app.layout = html.Div(children=[
     html.H1('Anki Dash'),
@@ -27,7 +28,7 @@ app.layout = html.Div(children=[
     dcc.Graph(id='mainplot'),
     dcc.Dropdown(id='char_select',
                  value=nbr_revs_df.head(5).character,
-                 options=[{'label':i,'value':i} for i in nbr_revs_df.character],
+                 options=[{'label': ch, 'value': ch} for ch in nbr_revs_df.character],
                  multi=True,
                  placeholder='A placeholder..'),
     dcc.Graph(id='charplot'),
