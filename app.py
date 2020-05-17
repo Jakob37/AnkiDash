@@ -10,8 +10,8 @@ app = dash.Dash(__name__)
 server = app.server
 app.title = "Anki Dash"
 
-nbr_revs_df = pd.read_csv("notebooks/top_difficult.tsv", sep="\t")
-all_revs_df = pd.read_csv("notebooks/all_reviews.tsv", sep="\t")
+nbr_revs_df = pd.read_csv("parsed_data/top_difficult.tsv", sep="\t")
+all_revs_df = pd.read_csv("parsed_data/all_reviews.tsv", sep="\t")
 
 fig = px.bar(
     nbr_revs_df,
