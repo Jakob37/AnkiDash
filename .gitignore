@@ -1,4 +1,5 @@
 *.Rproj
+parsed_data/
 test/
 .Rhistory
 *.iml

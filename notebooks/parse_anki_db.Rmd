@@ -3,22 +3,67 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+# Links
+
+Access raw database: https://chrisk91.me/2018/02/03/Accessing-the-Anki-database-via-R.html
+
+# Libraries
+
 ```{r}
 library(tidyverse)
+library(RSQLite)
+library(DBI)
+library(jsonlite)
 theme_set(theme_classic())
 ```
 
+# Access the database
+
+```{r}
+connection <- dbConnect(SQLite(), dbname="../data/collection.anki2")
+
+result <- dbSendQuery(connection, "SELECT * from cards")
+cardData <- dbFetch(result)
+dbClearResult(result)
+
+result <- dbSendQuery(connection, "SELECT * from col")
+collectionData <- dbFetch(result)
+dbClearResult(result)
+
+result <- dbSendQuery(connection, "SELECT * from notes")
+notesData <- dbFetch(result)
+dbClearResult(result)
+
+result <- dbSendQuery(connection, "SELECT * from revlog")
+revisionData <- dbFetch(result)
+dbClearResult(result)
+
+dbDisconnect(connection)
+```
+
+
+# First parsing
+
 ```{r}
 # 1579686732242
-character_ids <- read_tsv("../data/cards.csv") %>% filter(did == 1550758092309) %>% dplyr::select(card_id=id, notes_id=nid)
-notes_df <- read_tsv("../data/notes.tsv") %>% mutate(notes_id=id)
+#character_ids <- read_tsv("../data/cards.csv") %>% 
+#    filter(did == 1550758092309) %>% 
+#    dplyr::select(card_id=id, notes_id=nid)
+#notes_df <- read_tsv("../data/notes.tsv") %>% mutate(notes_id=id)
+
+
+character_ids <- cardData %>% 
+    filter(did == 1550758092309) %>% 
+    dplyr::select(card_id=id, notes_id=nid)
+
+notes_df <- notesData %>% mutate(notes_id=id)
 
 character_ids_w_char <- character_ids %>% 
     dplyr::inner_join(notes_df, by="notes_id") %>% 
     dplyr::select(card_id, notes_id, character=sfld)
 head(character_ids_w_char)
 
-revlog_df <- read_tsv("../data/revlog.csv") %>% 
+revlog_df <- revisionData %>% 
     dplyr::rename(card_id=cid) %>% 
     filter(card_id %in% character_ids_w_char$card_id) %>%
     inner_join(character_ids_w_char %>% dplyr::select(card_id, character), by="card_id") %>%
@@ -50,31 +95,189 @@ write_tsv(revlog_df_w_nbr, path = "../parsed_data/all_reviews.tsv")
 # table(notes_df$id %in% character_ids)
 ```
 
-# Investigating progress
-
-```{r}
-#top_difficult_cards[5, ]
-#top_difficult_cards[2, ]$card_id
-
-top_difficult_df <- revlog_df %>% 
-    filter(cid %in% top_difficult_cards[5, ]$card_id) %>% 
-    mutate(nbr=seq_len(n()))
-top_difficult_df %>% ggplot(aes(x=ease)) + geom_histogram()
-
-head(top_card_reviews)
-
-top_card_reviews %>% 
-    mutate(duration=ifelse(lastIvl < 0, -lastIvl/3600/24, lastIvl)) %>% 
-    #filter(lastIvl > 0) %>% 
-    ggplot(aes(x=nbr, y=duration)) + geom_line() + geom_point(aes(color=as.factor(ease)), size=3)
-```
-
-
 # Getting recently failed
 
 ```{r}
-revlog_df %>% filter(type==1 & ease==1) %>% tail()
+one_week_ago <- Sys.time() - (7 * 24 * 3600)
+one_week_ago_in_millisec <- as.numeric(one_week_ago) * 1000
 
+one_week_ago_in_millisec
+
+table(revlog_df$id > one_week_ago_in_millisec)
+
+recently_failed_reviews <- revlog_df %>% 
+    filter(type==1 & 
+               ease==1 & 
+               id > one_week_ago_in_millisec)
+
+recently_failed_reviews %>% pull(character) %>% table()
+
+
+
+```
+
+# Final step: Parse input to ChineseInSpace format
+
+`charToRaw` from `base` package seems to be the key!
+
+ā á ǎ à ē é ě è ī í ǐ ì ō ó ǒ ò ū ú ǔ ù ǖ ǘ ǚ ǜ 
+
+pinyin::py Able to retrieve pinyin for character
+
+https://github.com/pzhaonet/pinyin
+
+
+Need to think a bit how to pre parse it here!
+
+```{r}
+library(Unicode)
+library(pinyin)
+
+# anki_cards <- read_tsv("anki_char_cards.txt", locale = anki_cards <- read_tsv("anki_char_cards.txt", locale = readr::locale(encoding="UTF-8"), col_names = FALSE)
+#colnames(anki_cards) <- c("char", "descr")
+
+anki_cards <- cardData
+
+head(anki_cards)
+
+# anki_cards$pinyin <- 
+    
+pinyins <- lapply(strsplit(anki_cards$descr, " "), 
+       function(entry) {
+           entry[2]
+       }) %>% head(50) %>% unlist() %>% gsub("<br>.*", "", .)
+
+lapply(strsplit(anki_cards$descr, " "), 
+       function(entry) {
+           entry[3]
+       }) %>% head(50) %>% unlist() %>% gsub("<br>.*", "", .)
+
+#pinyin('羌笛何须怨杨柳春风不度玉门关', sep = ' ', method = 'tone')
+# pinyin::pinyin("我是一个苹果", method="tone")
+# pinyin::pinyin(stringi::stri_enc_toutf8("我是一个苹果"))
+# ?pinyin::pinyin
+
+# > library('pinyin')
+mypy_toneless = pydic(method = 'toneless')
+mypy_normal = pydic(method = 'quanpin')
+mypy_tone = pydic(method = 'tone')
+
+
+py("我", dic=mypy_toneless, sep="_")
+py("我", dic=mypy_normal, sep="_")
+py("我", dic=mypy_tone, sep="_")
+
+py(c("我", "一定", "是个", "天才"),  dic = mypy)
+#[1] "wo"
+
+pinyin_dict <- "C:/Users/jakob/OneDrive/Dokument/R/win-library/3.6/pinyin/lib/pinyin.txt"
+
+
+
+```
+
+
+# Initial experiments follow below
+
+Can be useful as source of possible commands for character conversions.
+
+```{r}
+
+tmcn::catUTF8("ŏ")
+getCharset()
+
+pinyins
+
+vect <- c("我", "他", "你")
+"我" %in% vect
+
+vect <- c("wŏ", "tā", "nǐ")
+"wŏ" %in% vect
+
+
+"wŏ" %in% pinyins[1]
+
+
+# out <- pinyin::py("我")
+
+# byte[] bytes = Encoding.Unicode.GetBytes("string here");
+
+
+rawToChar("77")
+
+char1 <- charToRaw(pinyins[2])
+char2 <- charToRaw("ŏ")
+
+pinyins
+
+rawToChar(char1)
+
+char1 == char2
+
+
+utf8ToInt("a")
+intToUtf8(97)
+
+as.hexmode(utf8ToInt("我"))
+intToUtf8(25105)
+
+
+utf8ToInt("o")
+utf8ToInt("ŏ")
+utf8ToInt("ǒ")
+utf8ToInt("ō")
+utf8ToInt("ó")
+utf8ToInt("ò")
+intToUtf8(111)
+
+pinyins[1]
+
+tone_threes %in% pinyins
+#"ŏ" %in% 
+strsplit(pinyins[1], "")[[1]]
+n_of_u_chars("ŏ")
+u_char("ŏ")
+u_char_match("ŏ", "ŏ")
+"\\ŏ" == unlist(strsplit(pinyins[1], ""))[2]
+"\\ǒ" == unlist(strsplit(pinyins[1], ""))[2]
+"ŏ" %in% unlist(strsplit(pinyins[1], ""))
+pinyins[1]
+tone_threes <- c("ă", "ě", "ǐ", "ǒ", "ǔ")
+"ǒ" == "ŏ"
+
+```
+
+
+
+
+
+
+pinyin_codes <- c(
+    "ā",
+    "á",
+    "ǎ",
+    "à",
+    "ē",      
+    "é",
+    "ě",
+    "è",
+    "ī",
+    "í",
+    "ǐ",
+    "ì",
+    "ǒ",
+    "ò",
+    "ū",
+    "ú",
+    "ǔ",
+    "ù",  
+    "ǚ"
+)
+
+
+# MAYBE NOT USED?
+
+```{r}
 ms_to_date = function(ms, t0="1970-01-01", timezone) {
         ## @ms: a numeric vector of milliseconds (big integers of 13 digits)
         ## @t0: a string of the format "yyyy-mm-dd", specifying the date that
@@ -87,6 +290,9 @@ ms_to_date = function(ms, t0="1970-01-01", timezone) {
 
 revlog_df$id[1]
 
+
+tail(revlog_df, 1)
+
 sec <- tail(revlog_df, 1)$id[1] / 1000
 sec
 as.POSIXct(sec, origin="1970-01-01")
@@ -96,8 +302,6 @@ as.POSIXct(sec, origin="1970-01-01")
 
 ?as.POSIXct
 ```
-
-
 
 
 
