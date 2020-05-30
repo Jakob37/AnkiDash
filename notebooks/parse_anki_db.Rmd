@@ -20,7 +20,8 @@ theme_set(theme_classic())
 # Access the database
 
 ```{r}
-connection <- dbConnect(SQLite(), dbname="../data/collection.anki2")
+source("../data/config.R")
+connection <- dbConnect(SQLite(), dbname=appdata_path)
 
 result <- dbSendQuery(connection, "SELECT * from cards")
 cardData <- dbFetch(result)
@@ -44,10 +45,10 @@ dbDisconnect(connection)
 
 # First parsing
 
+Deck ID loaded from config file (1550758092309)
+
 ```{r}
 # 1579686732242
-
-chinese_character_deck_id <- 1550758092309
 
 
 character_ids <- cardData %>% 
@@ -64,7 +65,7 @@ head(character_ids_w_char)
 revlog_df <- revisionData %>% 
     dplyr::rename(card_id=cid) %>% 
     filter(card_id %in% character_ids_w_char$card_id) %>%
-    inner_join(character_ids_w_char %>% dplyr::select(card_id, character), by="card_id") %>%
+    inner_join(character_ids_w_char %>% dplyr::select(card_id, character, back), by="card_id") %>%
     mutate(duration=ifelse(lastIvl < 0, -lastIvl/3600/24, lastIvl))
 
 revlog_df_w_nbr <- revlog_df %>% 
@@ -87,7 +88,8 @@ top_difficult_df <- top_difficult_cards %>% inner_join(character_ids_w_char, by=
 write_tsv(top_difficult_df, path = "../parsed_data/top_difficult.tsv")
 write_tsv(revlog_df_w_nbr, path = "../parsed_data/all_reviews.tsv")
 
-
+revlog_df
+character_ids_w_char
 
 # notes_df <- read_tsv("../data/notes.tsv") %>% mutate(id=as.character(id))
 # table(notes_df$id %in% character_ids)
@@ -109,7 +111,7 @@ recently_failed_reviews <- revlog_df %>%
                id > one_week_ago_in_millisec)
 
 recently_failed_reviews %>% pull(character) %>% table()
-
+recently_failed_reviews
 
 
 ```
@@ -140,16 +142,41 @@ mypy_tone = pydic(method = 'tone')
 
 head(character_ids_w_char)$back %>% map(~strsplit(., " ")[[1]][2])
 
-get_tones(head(character_ids_w_char)$character %>% head(), mypy_tone)
-pinyin::py(head(character_ids_w_char)$character %>% head(), dic=mypy_normal)
-pinyin::py(head(character_ids_w_char)$character %>% head(), dic=mypy_toneless)
+parsed_for_output <- recently_failed_reviews %>% mutate(character=character %>% gsub(" .*", "", .)) %>% distinct(character, .keep_all = TRUE)
+target_chars <- parsed_for_output %>% pull(character)
 
+parsed_for_output
+
+parsed_for_output
+
+meanings <- parsed_for_output$back %>% 
+    gsub("<br>.*", "", .) %>% 
+    gsub(".*\\. ", "", .) %>% 
+    str_extract(" .*") %>% 
+    gsub("^ ", "", .) 
+
+
+
+failed_chars_df <- data.frame(
+    raw_char=target_chars,
+    descr=parsed_for_output$back,
+    char=target_chars,
+    meaning=meanings,
+    pinyin=pinyin::py(target_chars, dic=mypy_normal) %>% unlist(),
+    base_pinyin=pinyin::py(target_chars, dic=mypy_toneless) %>% unlist(),
+    tone=get_tones(target_chars, mypy_tone) %>% unlist()
+)
+
+parsed_for_output$back %>% map(~gsub(".*\\.", "", .) %>% gsub("<br>", " ", .) %>% gsub("^ +", "", .))
+
+failed_chars_df
+
+output_path <- sprintf("%s/%s", output_dir, "recently_failed.txt")
+message("Writing to", output_path)
+write_tsv(failed_chars_df, path=output_path)
 ```
 
 
-```{r}
-# pinyin_dict <- "C:/Users/jakob/OneDrive/Dokument/R/win-library/3.6/pinyin/lib/pinyin.txt"
-```
 
 
 
