@@ -46,21 +46,19 @@ dbDisconnect(connection)
 
 ```{r}
 # 1579686732242
-#character_ids <- read_tsv("../data/cards.csv") %>% 
-#    filter(did == 1550758092309) %>% 
-#    dplyr::select(card_id=id, notes_id=nid)
-#notes_df <- read_tsv("../data/notes.tsv") %>% mutate(notes_id=id)
+
+chinese_character_deck_id <- 1550758092309
 
 
 character_ids <- cardData %>% 
-    filter(did == 1550758092309) %>% 
+    filter(did == chinese_character_deck_id) %>% 
     dplyr::select(card_id=id, notes_id=nid)
 
 notes_df <- notesData %>% mutate(notes_id=id)
 
 character_ids_w_char <- character_ids %>% 
     dplyr::inner_join(notes_df, by="notes_id") %>% 
-    dplyr::select(card_id, notes_id, character=sfld)
+    dplyr::select(card_id, notes_id, character=sfld, back=flds)
 head(character_ids_w_char)
 
 revlog_df <- revisionData %>% 
@@ -126,183 +124,32 @@ pinyin::py Able to retrieve pinyin for character
 
 https://github.com/pzhaonet/pinyin
 
-
-Need to think a bit how to pre parse it here!
+Using pinyin pydict to parse!
 
 ```{r}
-library(Unicode)
 library(pinyin)
 
-# anki_cards <- read_tsv("anki_char_cards.txt", locale = anki_cards <- read_tsv("anki_char_cards.txt", locale = readr::locale(encoding="UTF-8"), col_names = FALSE)
-#colnames(anki_cards) <- c("char", "descr")
+get_tones <- function(characters, pydict) {
+    pinyin::py(characters, dic = pydict) %>% 
+        map(~rev(strsplit(., "")[[1]])[1])
+}
 
-anki_cards <- cardData
-
-head(anki_cards)
-
-# anki_cards$pinyin <- 
-    
-pinyins <- lapply(strsplit(anki_cards$descr, " "), 
-       function(entry) {
-           entry[2]
-       }) %>% head(50) %>% unlist() %>% gsub("<br>.*", "", .)
-
-lapply(strsplit(anki_cards$descr, " "), 
-       function(entry) {
-           entry[3]
-       }) %>% head(50) %>% unlist() %>% gsub("<br>.*", "", .)
-
-#pinyin('羌笛何须怨杨柳春风不度玉门关', sep = ' ', method = 'tone')
-# pinyin::pinyin("我是一个苹果", method="tone")
-# pinyin::pinyin(stringi::stri_enc_toutf8("我是一个苹果"))
-# ?pinyin::pinyin
-
-# > library('pinyin')
 mypy_toneless = pydic(method = 'toneless')
 mypy_normal = pydic(method = 'quanpin')
 mypy_tone = pydic(method = 'tone')
 
+head(character_ids_w_char)$back %>% map(~strsplit(., " ")[[1]][2])
 
-py("我", dic=mypy_toneless, sep="_")
-py("我", dic=mypy_normal, sep="_")
-py("我", dic=mypy_tone, sep="_")
-
-py(c("我", "一定", "是个", "天才"),  dic = mypy)
-#[1] "wo"
-
-pinyin_dict <- "C:/Users/jakob/OneDrive/Dokument/R/win-library/3.6/pinyin/lib/pinyin.txt"
-
-
+get_tones(head(character_ids_w_char)$character %>% head(), mypy_tone)
+pinyin::py(head(character_ids_w_char)$character %>% head(), dic=mypy_normal)
+pinyin::py(head(character_ids_w_char)$character %>% head(), dic=mypy_toneless)
 
 ```
 
-
-# Initial experiments follow below
-
-Can be useful as source of possible commands for character conversions.
 
 ```{r}
-
-tmcn::catUTF8("ŏ")
-getCharset()
-
-pinyins
-
-vect <- c("我", "他", "你")
-"我" %in% vect
-
-vect <- c("wŏ", "tā", "nǐ")
-"wŏ" %in% vect
-
-
-"wŏ" %in% pinyins[1]
-
-
-# out <- pinyin::py("我")
-
-# byte[] bytes = Encoding.Unicode.GetBytes("string here");
-
-
-rawToChar("77")
-
-char1 <- charToRaw(pinyins[2])
-char2 <- charToRaw("ŏ")
-
-pinyins
-
-rawToChar(char1)
-
-char1 == char2
-
-
-utf8ToInt("a")
-intToUtf8(97)
-
-as.hexmode(utf8ToInt("我"))
-intToUtf8(25105)
-
-
-utf8ToInt("o")
-utf8ToInt("ŏ")
-utf8ToInt("ǒ")
-utf8ToInt("ō")
-utf8ToInt("ó")
-utf8ToInt("ò")
-intToUtf8(111)
-
-pinyins[1]
-
-tone_threes %in% pinyins
-#"ŏ" %in% 
-strsplit(pinyins[1], "")[[1]]
-n_of_u_chars("ŏ")
-u_char("ŏ")
-u_char_match("ŏ", "ŏ")
-"\\ŏ" == unlist(strsplit(pinyins[1], ""))[2]
-"\\ǒ" == unlist(strsplit(pinyins[1], ""))[2]
-"ŏ" %in% unlist(strsplit(pinyins[1], ""))
-pinyins[1]
-tone_threes <- c("ă", "ě", "ǐ", "ǒ", "ǔ")
-"ǒ" == "ŏ"
-
+# pinyin_dict <- "C:/Users/jakob/OneDrive/Dokument/R/win-library/3.6/pinyin/lib/pinyin.txt"
 ```
-
-
-
-
-
-
-pinyin_codes <- c(
-    "ā",
-    "á",
-    "ǎ",
-    "à",
-    "ē",      
-    "é",
-    "ě",
-    "è",
-    "ī",
-    "í",
-    "ǐ",
-    "ì",
-    "ǒ",
-    "ò",
-    "ū",
-    "ú",
-    "ǔ",
-    "ù",  
-    "ǚ"
-)
-
-
-# MAYBE NOT USED?
-
-```{r}
-ms_to_date = function(ms, t0="1970-01-01", timezone) {
-        ## @ms: a numeric vector of milliseconds (big integers of 13 digits)
-        ## @t0: a string of the format "yyyy-mm-dd", specifying the date that
-        ##      corresponds to 0 millisecond
-        ## @timezone: a string specifying a timezone that can be recognized by R
-        ## return: a POSIXct vector representing calendar dates and times        
-        sec = ms / 1000
-        as.POSIXct(sec, origin=t0, tz=timezone)
-}
-
-revlog_df$id[1]
-
-
-tail(revlog_df, 1)
-
-sec <- tail(revlog_df, 1)$id[1] / 1000
-sec
-as.POSIXct(sec, origin="1970-01-01")
-# ms_to_date(revlog_df$id[1] %>% as.numeric(), "GMT")
-
-# SUCCESS!
-
-?as.POSIXct
-```
-
 
 
 
